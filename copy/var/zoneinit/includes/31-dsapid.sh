@@ -16,7 +16,7 @@ if [[ ! -e /data/config.json ]]; then
   "mount_ui": "/opt/dsapid/ui",
   "listen": {
     "http": {
-      "address": "0.0.0.0:80",
+      "address": "127.0.0.1:8000",
       "ssl": false
     }
   },
