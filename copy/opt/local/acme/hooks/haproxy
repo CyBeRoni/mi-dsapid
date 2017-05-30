@@ -1,0 +1,36 @@
+#!/bin/sh
+
+set -e
+EVENT_NAME="$1"
+[ "$EVENT_NAME" = "live-updated" ] || exit 42
+# List of services. If any of these are in PATH (or HAPROXY_ALWAYS_GENERATE is
+# set), assume we need to generate combined files.
+HAPROXY_DAEMONS="haproxy"
+HAPROXY_UMASK="0077"
+
+[ -z "$ACME_STATE_DIR" ] && ACME_STATE_DIR="/var/lib/acme"
+[ -z "$HAPROXY_DH_PATH" ] && HAPROXY_DH_PATH="$ACME_STATE_DIR/conf/dhparams"
+# Don't do anything if no daemon requiring combined files is found.
+[ -n "$HAPROXY_ALWAYS_GENERATE" ] || {
+  ok=
+  for exe in $HAPROXY_DAEMONS; do
+    which "$exe" >/dev/null 2>/dev/null && ok=1 && break
+  done
+  [ -z "$ok" ] && exit 0
+}
+# Create coalesced files and a haproxy repository.
+umask 0022
+mkdir -p "$ACME_STATE_DIR/haproxy"
+umask $HAPROXY_UMASK
+while read name; do
+  certdir="$ACME_STATE_DIR/live/$name"
+  if [ -z "$name" -o ! -e "$certdir" ]; then
+    continue
+  fi
+  if [ -n "$HAPROXY_DH_PATH" -a -e "$HAPROXY_DH_PATH" ]; then
+    cat "$certdir/privkey" "$certdir/fullchain" "$HAPROXY_DH_PATH" > "$certdir/haproxy"
+  else
+    cat "$certdir/privkey" "$certdir/fullchain" > "$certdir/haproxy"
+  fi
+  [ -h "$ACME_STATE_DIR/haproxy/$name" ] || ln -fs "../live/$name/haproxy" "$ACME_STATE_DIR/haproxy/$name"
+done
